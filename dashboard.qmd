@@ -1,0 +1,178 @@
+---
+title: "Dashboard"
+format: dashboard
+editor_options: 
+  chunk_output_type: console
+execute:
+  echo: false
+---
+
+```{r}
+#| label: load-packages
+#| message: false
+
+# Required packages
+pacman::p_load(
+   tidyverse     # Data manipulation and visualization
+  ,dlookr        # Data diagnosis and exploration
+  ,kableExtra    # Enhanced 'knitr::kable()' tables
+  ,scales        # Visualization scaling tools
+  ,gt            # Stylish display tables
+  ,gridExtra     # Arrange plots
+)
+```
+
+```{r}
+#| label: load-data
+
+# Load dataset
+file_path <- "data/Different_stores_dataset.csv"
+data <- read.csv(file_path)
+
+# Convert date columns to Date format
+data$order_date <- as.Date(data$order_date, format = "%m/%d/%Y")
+data$ship_date <- as.Date(data$ship_date, format = "%m/%d/%Y")
+```
+
+# Overall Metrics
+
+```{r}
+#| label: overall-values
+# <!-- #| results: hide -->
+
+# Define value box values
+n_orders <- nrow(data)
+total_sales <- sum(data$sales, na.rm = TRUE)
+total_profit <- sum(data$profit, na.rm = TRUE)
+avg_discount <- mean(data$discount, na.rm = TRUE)
+profit_margin_rate <- total_profit / total_sales
+```
+
+## Overall Metrics {style="text-align: center; margin-bottom: 20px; font-size: 28px; font-weight: bold; color: #333;"}
+
+## Row {height="20%" style="display: flex; justify-content: space-evenly; align-items: center;"}
+
+```{r}
+#| content: valuebox
+#| title: "Total Orders"
+#| title-style: "font-size: 24px; font-weight: bold; text-align: center;"
+
+list(
+  color = "#3498db",
+  value = format(n_orders, big.mark = ","),
+  value_style = "font-size: 30px; font-weight: bold;"
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Total Sales"
+#| title-style: "font-size: 24px; font-weight: bold; text-align: center;"
+
+list(
+  color = "#3498db",
+  value = scales::dollar(total_sales),
+  value_style = "font-size: 30px; font-weight: bold;"
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Total Profit"
+#| title-style: "font-size: 24px; font-weight: bold; text-align: center;"
+
+list(
+  color = "#3498db",
+  value = scales::dollar(total_profit),
+  value_style = "font-size: 30px; font-weight: bold;"
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Average Discount"
+#| title-style: "font-size: 24px; font-weight: bold; text-align: center;"
+
+list(
+  color = "#3498db",
+  value = scales::percent(avg_discount),
+  value_style = "font-size: 30px; font-weight: bold;"
+)
+```
+
+```{r}
+#| content: valuebox
+#| title: "Profit Margin Rate"
+#| title-style: "font-size: 24px; font-weight: bold; text-align: center;"
+
+list(
+  color = "#3498db",
+  value = scales::percent(profit_margin_rate),
+  value_style = "font-size: 30px; font-weight: bold;"
+)
+```
+
+## Visualizations
+
+## Row {height="80%"}
+### Column {width="33%"} {.tabset}
+
+```{r}
+#| title: Sales By Region
+#<!-- #| fig-height: 8 -->
+#<!-- #| fig-width: 12 -->
+
+sales_region <- data %>% 
+  group_by(region) %>% 
+  summarize(total_sales = sum(sales, na.rm = TRUE))
+
+ggplot(sales_region, aes(x = reorder(region, total_sales), y = total_sales, fill = region)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  scale_y_continuous(labels = scales::dollar) +
+  labs(x = "Region", y = "Total Sales") +
+  theme(
+        axis.text = element_text(size = 36),
+        axis.title = element_text(size = 46))
+```
+
+### Column {width="33%"} {.tabset}
+
+```{r}
+#| title: Profit By Category
+#<!-- #| fig-height: 8 -->
+#<!-- #| fig-width: 12 -->
+
+profit_category <- data %>% 
+  group_by(category) %>% 
+  summarize(avg_profit_margin = mean(profit_margin, na.rm = TRUE))
+
+ggplot(profit_category, aes(x = reorder(category, avg_profit_margin), y = avg_profit_margin, fill = category)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  scale_y_continuous(labels = scales::percent) +
+  labs( x = "Category", y = "Average Profit Margin") +
+  theme(axis.text = element_text(size = 36),
+        axis.title = element_text(size = 46))
+```
+
+### Column {width="34%"} {.tabset}
+
+```{r}
+#| title: Top 10 Subcategories by Sales
+#<!-- #| fig-height: 8 -->
+#<!-- #| fig-width: 12 -->
+
+sales_subcategory <- data %>% 
+  group_by(subcategory) %>% 
+  summarize(total_sales = sum(sales, na.rm = TRUE)) %>% 
+  top_n(10, total_sales)
+
+ggplot(sales_subcategory, aes(x = reorder(subcategory, total_sales), y = total_sales, fill = subcategory)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +
+  scale_y_continuous(labels = scales::dollar) +
+  labs( x = "Subcategory", y = "Total Sales") +
+  theme(axis.text = element_text(size = 36),
+        axis.title = element_text(size = 46))
+```

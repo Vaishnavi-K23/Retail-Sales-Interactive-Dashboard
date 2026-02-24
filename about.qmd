@@ -1,0 +1,19 @@
+---
+title: "About"
+format: html
+editor: visual
+---
+
+This project was developed by **Pacman** For [INFO 526 - Data Analysis and Visualization](https://datavizaz.org/) at the University of Arizona, taught by Dr. Greg Chism. The team is comprised of the following team members.
+
+-   Ralph Dsouza : 1st-year Master's student in Information Science, graduating in 2026.
+
+-   Devashree Pawar : 1st-year Master's student in Data Science, graduating in 2026.
+
+-   Jayneet Jain : 1st-year Master's student in Data Science, graduating in 2026.
+
+-   Saksham Gupta : 2nd-year Master's student in Data Science, graduating in 2025.
+
+-   Vaishnavi Kulkarni : 1st-year Master's student in Data Science, graduating in 2026.
+
+-   Mihika Kubadia : 1st-year Master's student in Data Science, graduating in 2026.

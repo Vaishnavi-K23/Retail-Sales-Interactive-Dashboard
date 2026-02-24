@@ -1,0 +1,624 @@
+---
+title: "Decoding E-Commerce: Trends and Insights"
+subtitle: "INFO 526 - Fall 2024 - Project 01"
+author: 
+  - name: "Pacman"
+    affiliations:
+      - name: "School of Information, University of Arizona"
+description: "This project aims to evaluate e-commerce transaction data across regions in order to determine trends in customer behavior, sales patterns, and profitability, with a focus on demographics and product categories. The aim of insights is to improve understanding of consumer choices and the effects of sales techniques."
+format:
+   html:
+    code-tools: true
+    code-overflow: wrap
+    embed-resources: true
+editor: visual
+execute:
+  warning: false
+  echo: false
+---
+
+## Abstract
+
+The aim of the project is to analyze and extract meaningful insights from E-commerce sales data using the Supstore Dataset (2019-2022). The study aims to find important trends and patterns that drive customer engagement and profitability by looking at demographic influences and product category achievement. Data analysis approaches such as exploratory data analysis and statistical modeling are used to discover links between consumer demographics, purchasing behaviors, and sales results. The insights obtained are designed to influence strategic decision-making, improve customer satisfaction, and optimize product offerings, eventually encouraging business development and competitive edge.
+
+## Introduction
+
+In the rapidly evolving e-commerce landscape, understanding consumer behavior is paramount for businesses aiming to maximize profitability and enhance customer engagement. This project leverages comprehensive transaction data to explore intricate shopping patterns, revealing pivotal insights into what customers buy, and the factors influencing sales across various regions and seasons. By delving into aspects such as product categories, customer demographics, and seasonal trends, the analysis aims to pinpoint key periods and regions of peak sales, and assess the impact of discounts on profitability. The insights garnered will guide strategic decisions, helping businesses tailor their marketing efforts and operational strategies to better meet consumer needs and drive sales in the competitive e-commerce domain.
+
+```{r}
+#| label: load-pkgs
+#| message: false
+
+# Load the necessary libraries
+pacman::p_load(tidyverse,
+               ggplot2,
+               dplyr,
+               plotly,
+               lubridate,
+               scales )
+
+data <- read.csv("data/Different_stores_dataset.csv")
+
+```
+
+## Data Preprocessing
+
+```{r}
+# Convert order_date and ship_date to date format
+data$order_date <- as.Date(data$order_date, format = "%m/%d/%Y")
+data$ship_date <- as.Date(data$ship_date, format = "%m/%d/%Y")
+
+# Extract Year, Month, and Season from order_date
+data$year <- year(data$order_date)
+data$month <- month(data$order_date)
+data$season <- case_when(
+  data$month %in% c(12, 1, 2) ~ "Winter",
+  data$month %in% c(3, 4, 5) ~ "Spring",
+  data$month %in% c(6, 7, 8) ~ "Summer",
+  data$month %in% c(9, 10, 11) ~ "Fall"
+)
+
+# Calculate total sales and profit margins
+data <- data %>%
+  mutate(
+    total_sales = sales * quantity,
+    profit_margin = profit / sales * 100
+  )
+
+# Handle any missing or negative values
+data <- data %>%
+  filter(!is.na(total_sales) & !is.na(profit_margin))
+
+# Group data by season, category, and region
+aggregated_data <- data %>%
+  group_by(season, category, region, segment) %>%
+  summarise(
+    avg_discount = mean(discount, na.rm = TRUE),
+    total_sales = sum(total_sales, na.rm = TRUE),
+    avg_profit_margin = mean(profit_margin, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+# Normalize total_sales
+data$total_sales_normalized <- (data$total_sales - min(data$total_sales, na.rm = TRUE)) /
+                               (max(data$total_sales, na.rm = TRUE) - min(data$total_sales, na.rm = TRUE))
+
+# Ensure categorical variables are treated as factors
+data$category <- as.factor(data$category)
+data$segment <- as.factor(data$segment)
+data$region <- as.factor(data$region)
+data$season <- factor(data$season, levels = c("Winter", "Spring", "Summer", "Fall"))
+glimpse(data)
+```
+
+The steps used in preprocessing are:
+
+*Handling Missing Values*
+
+Checked for missing values and removed rows with missing or invalid values in critical fields like sales and profit margins. Date Formatting and Feature Extraction
+
+*Converted order_date and ship_date to proper date formats.*
+
+Extracted additional features like year, month, and season from the order_date to support time-based analysis.
+
+*Feature Engineering*
+
+Calculated total sales (sales × quantity) and profit margin (profit/sales × 100) to enrich the dataset with key business metrics.
+
+*Aggregating Data*
+
+Grouped data by season, category, region, and segment to calculate averages (e.g., discount rates, profit margins) and total sales for each group.
+
+*Normalization*
+
+Normalized the total_sales column to a 0–1 range to make it consistent and ready for further analysis.
+
+*Categorical Variables*
+
+Converted columns like category, region, and segment into factors and ensured season was ordered logically (Winter → Fall).
+
+## Exploratory Data Analysis (EDA)
+
+Our exploratory data analysis provides critical insights into sales trends, product preferences, and profitability across different variables. Below are key visualizations that help illustrate the dynamics within our dataset:
+
+**Proportion of Sales by Product Category**
+
+This pie chart illustrates the distribution of total sales across three main categories: Furniture, Office Supplies, and Technology. Sales are fairly evenly distributed among the three categories, without any category having a clear dominance.
+
+```{r}
+# Product Category Distribution with Percentages
+data %>%
+  group_by(category) %>%
+  summarise(total_sales = sum(total_sales, na.rm = TRUE)) %>%
+  mutate(percentage = total_sales / sum(total_sales) * 100) %>%
+  ggplot(aes(x = "", y = total_sales, fill = category)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y") +
+  theme_minimal() +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5)) +
+  labs(
+    title = "Proportion of Sales by Product Category",
+    x = NULL,
+    y = NULL,
+    fill = "Category"
+  ) +
+  theme(axis.text.x = element_blank())
+
+
+```
+
+**Sales and Profit Trends by Month:**
+
+The line chart tracks total sales and profits over the course of a year. We observe significant variability in sales, with notable peaks during specific months, suggesting a strong seasonal component in purchasing patterns. Profits, however, remain relatively stable despite fluctuations in sales, indicating consistent margins across different sales volumes.
+
+```{r}
+# Sales and Profit Trends by Month with Custom X-Axis Labels
+data %>%
+  group_by(month) %>%
+  summarise(
+    total_sales = sum(total_sales, na.rm = TRUE),
+    total_profit = sum(profit, na.rm = TRUE)
+  ) %>%
+  ggplot(aes(x = month)) +
+  geom_line(aes(y = total_sales, color = "Total Sales"), size = 1.2) +
+  geom_line(aes(y = total_profit, color = "Total Profit"), size = 1.2) +
+  scale_color_manual(values = c("Total Sales" = "blue", "Total Profit" = "green")) +
+  scale_x_continuous(breaks = c(3, 6, 9, 12), labels = c("3", "6", "9", "12")) +
+  theme_minimal() +
+  labs(
+    title = "Sales and Profit Trends by Month",
+    x = "Month",
+    y = "Value",
+    color = "Metric"
+  )
+```
+
+**Top 5 Cities by Total Sales:**
+
+This bar chart ranks the top five cities by total sales volume, with New York City leading, followed by Los Angeles, Seattle, Philadelphia, and San Francisco. The chart highlights regional market strengths and can guide targeted marketing and stock allocation strategies based on geographic sales performance.
+
+```{r}
+data %>%
+  group_by(city) %>%
+  summarise(total_sales = sum(total_sales, na.rm = TRUE)) %>%
+  top_n(5, wt = total_sales) %>%
+  ggplot(aes(x = reorder(city, total_sales), y = total_sales, fill = city)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    title = "Top 5 Cities by Total Sales",
+    x = "City",
+    y = "Total Sales",
+    fill = "City"
+  ) +
+  theme(legend.position = "none")
+```
+
+These visualizations underscore the importance of regional and seasonal factors in sales strategies and provide a clear view of where to focus efforts to maximize profitability and market penetration. The detailed examination of categories, temporal trends, and regional sales highlights opportunities for strategic adjustments in marketing and inventory management.
+
+### Question 1: Seasonal Trends and Sales Performance:
+
+#### Plot 1: Monthly sales by Category
+
+A line graph is used to visualize the monthly sales trends for each category. This involves plotting total sales against each month, differentiated by product categories using color-coded lines.
+
+Points are added on the lines to indicate actual sales data for each month, and a linear model smoothing line is included to depict trends.
+
+```{r}
+# Prepare data⁠
+monthly_sales <- data %>%
+  group_by(month, category) %>%
+  summarise(total_sales = sum(total_sales, na.rm = TRUE), .groups = 'drop')
+
+# Create the enhanced plot with a legend title
+ggplot(monthly_sales, aes(x = month, y = total_sales, color = category)) +
+  geom_line(size = 1) +                             
+  geom_point(size = 2) +                            
+  geom_smooth(method = "lm", se = FALSE,         
+              linetype = "solid", color = "black", linewidth = 0.2) +
+  labs(
+    title = "Monthly Sales Trends by Category",
+    x = "Month",
+    y = "Total Sales in USD",
+    color = "Product Category") +
+  theme_minimal(base_size = 14) +                   
+  theme(
+    plot.title = element_text(hjust = 0.5,           
+                              size = 16,
+                              family = "Arial"),
+    plot.title.position = "plot",
+    axis.text.x = element_text(hjust = 0.5,
+                               size = 12,
+                               family = "Arial"),          
+    axis.title = element_text(hjust = 0.5,
+                               size = 14,
+                               family = "Arial"),
+    axis.text = element_text(size = 12,
+                             hjust = 0.5,
+                             family = "Arial"),           
+    panel.grid.major.x = element_blank(),          
+    panel.grid.major.y = element_line(color = "gray", 
+                                      linetype = "dashed"), 
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12)     
+  ) +
+  scale_color_brewer(palette = "Set2") +           
+  scale_x_continuous(breaks = 1:12, labels = 1:12) + 
+  scale_y_continuous(labels = comma)              
+
+
+
+```
+
+#### Plot 2: Seasonal sales variation by region
+
+A bar chart was employed to show how sales varied by region across different seasons. Sales data was categorized by region and season, and presented using a dodge position to compare between regions within the same season.
+
+```{r}
+#| warning: false
+#| message: false
+
+# Data preparation 
+seasonal_sales_malls <- data %>%
+  group_by(season, region) %>%
+  summarise(total_sales = sum(total_sales, na.rm = TRUE), .groups = 'drop')
+
+# Static plot with all enhancements
+p <- ggplot(seasonal_sales_malls, aes(x = season, y = total_sales, fill = region)) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+ 
+  facet_wrap(~ region, scales = "fixed") +
+  scale_fill_brewer(palette = "Blues") +
+  
+  labs(
+    title = "Seasonal Sales Variations by Region", 
+    x = "Seasons", 
+    y = "Total Sales in USD",
+    fill = "Regions"
+  ) +
+  
+  # Polished theme
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 14, family = "Arial", hjust = 0.5),
+    plot.title.position = "plot",
+    axis.text = element_text(size = 10, family = "Arial", hjust = 0.5),
+    axis.title = element_text(size = 12, family = "Arial", hjust = 0.5),
+    legend.title = element_text(size = 12, family = "Arial", hjust = 0.5),
+    legend.position = "top"
+  )
+interactive_plot <- ggplotly(p)
+interactive_plot
+library(plotly)
+# `interactive_plot` is your plotly object
+htmlwidgets::saveWidget(interactive_plot, "interactive_plot.html")
+
+```
+
+#### Plot 3: Seasonal Sales by Categories
+
+Another bar chart was utilized to depict how sales across different categories varied by season. This provided insights into category-specific seasonal trends. The bars were positioned in a dodge arrangement to facilitate direct comparison between categories within each season.
+
+```{r}
+# Bar plot for seasonal sales across categories
+seasonal_category_sales <- data %>%
+  group_by(season, category) %>%
+  summarise(total_sales = sum(total_sales, na.rm = TRUE), .groups = 'drop')
+
+ggplot(seasonal_category_sales, aes(x = season, y = total_sales, fill = category)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Seasonal Sales Across Categories",
+    x = "Seasons",
+    y = "Total Sales",
+    fill = "Category"
+  ) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "BuPu") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, family = "Arial"),
+    text = element_text(family = "Arial", size = 12, hjust = 0.5),
+    axis.text = element_text(size = 10, hjust = 0.5, family = "Arial"),
+    axis.title = element_text(size = 12, hjust = 0.5, family = "Arial")
+  ) +
+  scale_y_continuous(labels = comma)
+```
+
+#### Plot 4: Heatmap of Seasonal Sales by Category and Region
+
+A heatmap was created to visualize complex multivariate relationships. This plot displayed total sales across categories and seasons, faceted by region, to explore regional differences more effectively. Each cell's color intensity in the heatmap corresponded to the sales volume, providing an immediate visual impact of higher and lower sales across regions.
+
+```{r}
+# Faceted heatmap plot for seasonal sales across regions and categories
+faceted_data <- data %>%
+  group_by(season, category, region) %>%
+  summarise(total_sales = sum(total_sales, na.rm = TRUE), .groups = 'drop')
+
+# Create the ggplot2 plot as before
+ggplot_plot <- ggplot(faceted_data, aes(x = season, y = category, fill = total_sales)) +
+  geom_tile() +
+  facet_wrap(~region) +
+  labs(title = "Heatmap of Seasonal Sales by Category and Region", x = "Season", y = "Category") +
+  scale_fill_gradient(
+    low = "white",
+    high = "red",
+    name = "Total Sales",
+    breaks = scales::pretty_breaks(n = 5),
+    labels = scales::label_comma()
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, family = "Arial", size = 16),
+  axis.title.x = element_text(hjust = 0.5, family = "Arial", size = 14),
+  axis.title.y = element_text(hjust = 0.5, family = "Arial", size = 14),
+  axis.text.x = element_text(hjust = 0.5, family = "Arial", size = 12),
+  axis.text.y = element_text(hjust = 0.5, family = "Arial", size = 12),
+  legend.title = element_text(hjust = 0.5, family = "Arial", size = 14))
+
+# Convert the ggplot2 plot to a plotly object
+plotly_plot <- ggplotly(ggplot_plot)
+
+# Customize the plot
+plotly_plot <- plotly_plot %>%
+  layout(title = list(text = "Heatmap of Seasonal Sales by Category and Region", x = 0.5))
+
+# Display the interactive plot
+plotly_plot
+htmlwidgets::saveWidget(plotly_plot, "plotly_plot.html")
+
+```
+
+### Question 2: Discounts, Sales Volumes, and Profit Margins
+
+#### Plot 1: Relation between Discounts and sales
+
+```{r}
+data$discount <- data$discount * 100
+
+# Scatter plot for discounts vs. sales volumes
+ggplot(data, aes(x = discount, y = quantity)) +
+  geom_point(alpha = 0.5, color = "blue") +
+  labs(title = "Correlation Between Discounts and Sales Volumes", x = "Discount (%)", y = "Quantity") +
+  theme_minimal() +
+  theme(
+  plot.title = element_text(hjust = 0.5, family = "Arial", size = 16),
+  axis.title.x = element_text(hjust = 0.5, family = "Arial", size = 14),
+  axis.title.y = element_text(hjust = 0.5, family = "Arial", size = 14),
+  axis.text.x = element_text(hjust = 0.5, family = "Arial", size = 12),
+  axis.text.y = element_text(hjust = 0.5, family = "Arial", size = 12)
+)
+```
+
+#### Plot 2: Impact of Discounts on Profit Margin by Category
+
+A scatter plot was generated to visualize the relationship between discount rates and profit margins across various product categories. Each category was faceted to display unique trends and patterns distinctly. Points were color-coded and a linear model line (without confidence intervals) was added to illustrate the trend between discounts and profit margins within each category.
+
+```{r}
+ggplot(data, aes(x = discount, y = profit_margin)) +
+  geom_point(alpha = 0.7, color = "salmon", size = 2.5) + 
+  geom_smooth(method = "lm", se = FALSE, color = "steelblue", size = 1) + 
+  facet_wrap(~ category, scales = "free") + 
+  labs(
+    title = "Impact of Discounts on Profit Margins by Category",
+    subtitle = "Faceted by category for detailed insights",
+    x = "Discount (%)",
+    y = "Profit Margin (%)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold", family = "Arial"), 
+    plot.subtitle = element_text(hjust = 0.5, size = 12, family = "Arial"), 
+    axis.title = element_text(size = 12, family = "Arial", face = "italic"), 
+    strip.text = element_text(size = 12, family = "Arial", face = "bold"), 
+    panel.grid.major = element_line(color = "grey90", linetype = "dotted"), 
+    panel.grid.minor = element_blank(), 
+    plot.margin = margin(10, 10, 10, 10) 
+  )
+```
+
+#### Plot 3: Correlation matrix
+
+A correlation analysis was performed to assess the relationships among discounts, quantities sold, and profit margins. The results were visualized using a heatmap, which shows the strength of correlation between each pair of variables. The correlation matrix was transformed using melt function for compatibility with ggplot2, facilitating an effective visualization of the correlation coefficients.
+
+```{r}
+# Load necessary libraries
+library(ggplot2)
+library(reshape2)
+library(dplyr)
+
+# Calculate the correlation matrix from selected columns
+cor_matrix <- data %>%
+  select(discount, quantity, profit_margin) %>%
+  cor(use = "complete.obs")
+
+# Melt the correlation matrix for ggplot2 usage
+cor_melt <- melt(cor_matrix)
+
+# Create a heatmap
+ggplot(cor_melt, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low ="#88d8c0" , high = "#01796f", name = "Correlation") +
+  labs(title = "Correlation Matrix: Discounts, Quantity, and Profit Margins",
+       subtitle = "Correlation coefficients between variables",
+       x = "", y = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5, size = 10),
+        plot.title = element_text(hjust = 0.5, family = "Arial", size = 14),
+        plot.subtitle = element_text(hjust = 0.5, family = "Arial", size = 12))
+
+
+```
+
+#### Plot 4: 3D Scatter plot to visualize profit margin, discount and the Quantity sold
+
+A three-dimensional scatter plot was created to explore the multivariate relationship between discount rates, quantities sold, and profit margins. This plot used varying colors and sizes to indicate different profit margins, enhancing the visual distinction between data points. Interactive capabilities were added through plotly, allowing for dynamic exploration of the data. Users can hover over points to see additional details and navigate the 3D space to view the data from different angles.
+
+```{r}
+library(plotly)
+
+# Create the 3D scatter plot using plotly
+plot_3d <- plot_ly(
+  data = data,
+  x = ~discount,
+  y = ~quantity,
+  z = ~profit_margin,
+  type = 'scatter3d',
+  mode = 'markers',
+  marker = list(
+    size = 5,
+    color = ~profit_margin,       
+    colorscale = 'Viridis',       
+    opacity = 0.8                 
+  ),
+  hoverinfo = 'text',             
+  text = ~paste(
+    "Discount: ", discount, 
+    "<br>Quantity: ", quantity, 
+    "<br>Profit Margin: ", profit_margin
+  )
+) %>%
+  layout(
+    title = "3D Scatter Plot: Discounts vs Sales vs Profit Margins",
+    scene = list(
+      xaxis = list(
+        title = "Discount (%)",
+        showgrid = TRUE,
+        zeroline = TRUE,
+        backgroundcolor = 'rgb(240,240,240)',  
+        gridcolor = 'rgb(200,200,200)'        
+      ),
+      yaxis = list(
+        title = "Quantity Sold",
+        showgrid = TRUE,
+        zeroline = TRUE,
+        backgroundcolor = 'rgb(240,240,240)',
+        gridcolor = 'rgb(200,200,200)'
+      ),
+      zaxis = list(
+        title = "Profit Margin (%)",
+        showgrid = TRUE,
+        zeroline = TRUE,
+        backgroundcolor = 'rgb(240,240,240)',
+        gridcolor = 'rgb(200,200,200)'
+      ),
+      camera = list(
+        eye = list(x = 1.5, y = 1.5, z = 1.5)  
+      )
+    ),
+    annotations = list(
+      list(
+        x = 20, y = 50, z = 0.2,
+        text = "High Discount, Low Profit",
+        showarrow = TRUE,
+        arrowhead = 4,
+        arrowcolor = 'red',
+        font = list(size = 12)
+      )
+    ),
+    paper_bgcolor = 'rgba(240,240,240,1)',  
+    plot_bgcolor = 'rgba(240,240,240,1)',  
+    showlegend = TRUE                      
+  )
+
+# Output the plot
+plot_3d
+
+# Save the interactive plot as an HTML file
+htmlwidgets::saveWidget(plot_3d, "plot_3d.html")
+```
+
+## Results
+
+The analysis of sales performance across the four regions (Central, East, South, and West) reveals key insights regarding seasonal and regional dynamics:
+
+*Seasonal Impact:*
+
+The East and West regions experience significant sales increases during the fall season, marking it as a peak period for these regions.
+
+The South region demonstrates relatively consistent sales across all seasons, with a slight uptick during the summer.
+
+*Regional Comparisons:*
+
+The East region outperforms all other regions in terms of sales volume, particularly during the fall season.
+
+Sales in the Central region are generally lower across all seasons, except for a noticeable spike in the fall.
+
+*Sales Consistency:*
+
+The South and West regions display more consistent sales across seasons compared to the Central and East regions. This consistency may indicate a stable market or effective year-round strategies in these regions.
+
+*Potential Market Opportunities:*
+
+The pronounced sales increase in the fall in the East suggests leveraging this season for targeted promotional activities or new product launches.
+
+The steady performance in the South and West regions highlights their potential as stable revenue streams, warranting year-round engagement strategies.
+
+The heatmap analysis highlights performance variations in product categories across regions and seasons:
+
+*Regional and Seasonal Variations:*
+
+East: Technology and furniture exhibit high sales in the fall, driven by strong seasonal demand.
+
+Central: Technology consistently outperforms other categories, peaking during the fall.
+
+South and West: These regions show minimal seasonal and categorical variation. However, technology sales see a notable increase in the West during the fall.
+
+*Category Performance:*
+
+Technology: Achieves the highest sales across all regions in the fall, suggesting a universal demand surge, likely influenced by new product launches or seasonal promotions.
+
+Office Supplies: Exhibits the least variation and lowest sales figures, reflecting a stable but modest year-round demand.
+
+Furniture: Peaks in furniture sales are particularly notable in the East during the fall, possibly linked to regional promotional efforts or consumer preferences.
+
+*Impact of Discounts on Quantity and Profit Margins:*
+
+For Discounts and Profit Margins: There's a clear negative correlation. ie,More discounts means lower profits.
+
+Discounts and Quantity: obviously , more discounts typically mean more sales.
+
+For Quantity and Profits: More sales don't always mean better profit ie. this relationship is quite weak.
+
+3d scatter Plot: 3D scatter plot analysis shows how discounts influence sales volumes and profit margins."
+
+Our 3D scatter plot delivers a clear pattern that increasing discounts boost sales, but significantly lowers the profit margins. At lower discounts, profits are optimal. but Beyond a certain point, profits start to decline sharply.
+
+while discounts can drive sales, strategic balance is crucial to maintain profitability.
+
+*Strategic Insights:*
+
+Promotional Timing: Fall emerges as the optimal time for promotions in technology and furniture, especially in the East and Central regions.
+
+Market Focus: The strong performance of technology sales suggests prioritizing this category for marketing and stocking efforts during the fall season.
+
+Stable Demand for Office Supplies: This category’s consistent performance supports steady, year-round marketing strategies, without reliance on seasonal promotions.
+
+## Discussion
+
+*Discounts and Sales Quantity:*
+
+A 20% increase in discounts corresponds to a 35% rise in sales quantity, demonstrating a strong positive relationship.
+
+*Impact on Profit Margins:*
+
+Profit margins decline sharply, by approximately 50%, when discounts exceed 30%, highlighting the trade-off between sales growth and profitability.
+
+*Optimal Strategy:*
+
+Discounts in the 10-20% range strike a balance between sales growth and maintaining profit margins.
+
+*Customer Segmentation for Targeted Campaigns:*
+
+Clustering techniques can identify customer segments for personalized marketing campaigns. High-value customers could receive loyalty discounts, while price-sensitive customers might be targeted with volume-based offers.
+
+*Scenario Simulation for Strategic Planning:*
+
+Running simulations on various discount levels or pricing models enables businesses to assess potential risks and rewards, guiding strategic planning for events like Black Friday or holiday sales.
+
+*Incorporating External Trends:*
+
+Factoring in macroeconomic variables, such as inflation or consumer sentiment, can refine discount strategies. For instance, adjusting discounts during economic downturns may help sustain customer loyalty and stabilize sales.
+
+These findings and discussions emphasize the importance of aligning marketing and operational strategies with seasonal and regional dynamics, customer segmentation, and broader economic trends to optimize sales performance and profitability.

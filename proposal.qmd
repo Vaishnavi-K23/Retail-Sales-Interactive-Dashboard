@@ -1,0 +1,197 @@
+---
+title: "Decoding E-Commerce: Trends and Insights"
+subtitle: "Proposal"
+author: 
+  - name: "Pacman"
+    affiliations:
+      - name: "School of Information, University of Arizona"
+description: "This project aims to evaluate e-commerce transaction data across regions in order to determine trends in customer behavior, sales patterns, and profitability, with a focus on demographics and product categories. The aim of insights is to improve understanding of consumer choices and the effects of sales techniques."
+format:
+  html:
+    code-tools: true
+    code-overflow: wrap
+    code-line-numbers: true
+    embed-resources: true
+editor: visual
+code-annotations: hover
+execute:
+  warning: false
+---
+
+```{r}
+#| label: load-pkgs
+#| message: false
+library(tidyverse)
+library(dplyr)
+library(lubridate)
+```
+
+## Dataset
+
+```{r}
+#| label: load-dataset
+#| message: false
+data <- read.csv("data/Different_stores_dataset.csv")
+glimpse(data)
+
+```
+
+## **Data Description**
+
+#### **Source of the Data**
+
+This dataset comes from Kaggle and includes transaction records from different shopping malls and regions, designed to give a broad overview of consumer habits, sales patterns, and seasonal trends in e-commerce.
+
+#### **Collection Information**
+
+The data covers all authorizations 2019 to 2022. With its multi-year scope, the dataset offers a consistent view of transaction details, customer demographics, and location-specific data, making it well-suited for financial and trend analyses over time.
+
+**Description of Observations**
+
+This dataset includes diverse types of information, categorized as follows:
+
+#### **Transaction Details**
+
+-   Each record contains detailed transaction information, including:
+
+    -   **Order Date and Ship Date**: Helps in identifying order processing and shipping durations.
+
+    -   **Total Sales**: The monetary value of sales for each transaction.
+
+    -   **Discounts Applied**: Percentage discounts offered on products, aiding in the analysis of how discounts affect sales and profit margins.
+
+    -   **Profit Margins**: Calculated profit as a percentage of sales, useful for analyzing profitability trends.
+
+#### **Product Information**
+
+-   The dataset includes detailed descriptions of products sold, categorized as follows:
+
+    -   **Category and Subcategory**: Organizes items into broad and specific groups, enabling trend analysis within specific product types.
+
+    -   **Product Name and Manufacturer**: Useful for analyzing product-level performance and identifying top-performing manufacturers or brands.
+
+#### **Customer Segmentation**
+
+-   Customer details are included to support demographic and segment-specific analysis:
+
+    -   **Customer Names**: Identifies unique buyers.
+
+    -   **Segment**: Classifies customers as "Consumer," "Corporate," or "Home Office," helping to analyze sales across different segments.
+
+#### **Regional and Geographic Indicators**
+
+-   The dataset associates transactions with geographic and regional data:
+
+    -   **City, State, Region, and ZIP Code**: Provides granularity for regional performance analysis.
+
+    -   **Country**: Helps in identifying global patterns if applicable.
+
+#### **Payment and Discounts**
+
+-   Insights into financial behaviors:
+
+    -   **Discount Rates**: Helps identify trends in discounting and its impact on sales volumes and profitability.
+
+    -   **Profit and Sales Values**: Facilitates the analysis of relationships between discounting, sales performance, and profitability.
+
+#### **Shipping Details**
+
+-   Additional fields:
+
+    -   **Shipping Durations**: Derived from the difference between order date and ship date to analyze delivery efficiency.
+
+## **Ethical Considerations**
+
+While the dataset includes customer demographic details like age and gender, it does not contain any personal identifiers, helping to maintain privacy. Since the dataset is publicly available on Kaggle, it appears any necessary anonymization was applied beforehand. However, careful interpretation is needed when using demographic data to avoid inadvertently reinforcing stereotypes or drawing unsupported conclusions about certain groups.
+
+## **Data Preprocessing**
+
+```{r}
+#| label: data-preprocessing
+#| message: false
+
+sum(is.na(data))
+
+# Check unique values for categorical columns
+unique(data$category)
+unique(data$region)
+unique(data$segment)
+
+# Convert order_date and ship_date to date format
+data$order_date <- as.Date(data$order_date, format = "%m/%d/%Y")
+data$ship_date <- as.Date(data$ship_date, format = "%m/%d/%Y")
+
+# Extract Year, Month, and Season from order_date
+data$year <- year(data$order_date)
+data$month <- month(data$order_date)
+data$season <- case_when(
+  data$month %in% c(12, 1, 2) ~ "Winter",
+  data$month %in% c(3, 4, 5) ~ "Spring",
+  data$month %in% c(6, 7, 8) ~ "Summer",
+  data$month %in% c(9, 10, 11) ~ "Fall"
+)
+
+# Calculate total sales and profit margins
+data <- data %>%
+  mutate(
+    total_sales = sales * quantity,
+    profit_margin = profit / sales * 100
+  )
+
+# Handle any missing or negative values
+data <- data %>%
+  filter(!is.na(total_sales) & !is.na(profit_margin))
+
+# Group data by season, category, and region
+aggregated_data <- data %>%
+  group_by(season, category, region, segment) %>%
+  summarise(
+    avg_discount = mean(discount, na.rm = TRUE),
+    total_sales = sum(total_sales, na.rm = TRUE),
+    avg_profit_margin = mean(profit_margin, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+# Normalize total_sales
+data$total_sales_normalized <- (data$total_sales - min(data$total_sales, na.rm = TRUE)) /
+                               (max(data$total_sales, na.rm = TRUE) - min(data$total_sales, na.rm = TRUE))
+
+# Ensure categorical variables are treated as factors
+data$category <- as.factor(data$category)
+data$segment <- as.factor(data$segment)
+data$region <- as.factor(data$region)
+data$season <- factor(data$season, levels = c("Winter", "Spring", "Summer", "Fall"))
+
+```
+
+## Questions
+
+-   How Do Seasonal Trends Affect Sales Performance Across Different Categories?
+
+    We are going to investigate the impact of seasonal fluctuations on sales across product categories, locations, and payment methods. This question will help identify peak seasons and preferred payment options during high-demand periods.
+
+-   What Are the Relationships Between Discounted Prices, Sales Volumes, and Profit Margins in Different Shopping Malls and Product Categories?
+
+    Through this question, we will examine the influence of discounts on sales volumes and profit margins, analyzing correlations across product categories and shopping malls.
+
+## Analysis Plan
+
+-   Seasonal Trends and Sales Performance:\
+
+    1.  Analyze monthly sales trends by category.\
+    2.  Segment data by malls to explore seasonal sales variations.\
+    3.  Examine the distribution of payment methods by season.\
+    4.  Compare seasonal sales across categories, payment methods, and malls.\
+        Planned Visualizations: Line graphs, stacked area charts, heatmaps, and faceted bar plots.
+
+-   Discounts, Sales Volumes, and Profit Margins:\
+
+    1.  Calculate and analyze discount percentages.\
+    2.  Assess correlation of discounts with sales volumes.\
+    3.  Determine profit margins post-discounts.\
+    4.  Conduct correlation analysis among discounts, volumes, and margins.\
+        Planned Visualizations: Scatter plots, bar charts, correlation matrices, and 3D scatter plots.
+
+## Citations
+
+**T. Chant,** "Supstore Dataset 2019-2022," *Kaggle*, Jul. 12, 2022. \[Online\]. Available: [Superstore Dataset 2019-2022](https://www.kaggle.com/datasets/timchant/supstore-dataset-2019-2022/data). \[Accessed: Dec. 13, 2024\].

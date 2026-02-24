@@ -1,0 +1,93 @@
+---
+title: "Decoding E-Commerce Trends and Insights"
+subtitle: "INFO 526 - Fall 2024 - Project 1"
+author: "Ralph Dsouza, Saksham Gupta, Vaishnavi Kulkarni,Jayneet Jain, Mihika Kubadia, Devashree Pawar."	
+title-slide-attributes:
+  data-background-image: images/watercolour_sys02_img34_teacup-ocean.jpg
+  data-background-size: stretch
+  data-background-opacity: "0.7"
+  data-slide-number: none
+  
+format:
+  revealjs:
+    slide-number: true
+    theme:  ['data/customtheming.scss']
+    
+  
+editor: visual
+execute:
+  echo: false
+---
+
+## Introduction and Motivation
+
+-   **E-commerce dynamics:** Rapidly evolving market demands a deeper understanding of consumer behavior.
+
+-   **Strategic value:** Insights guide businesses in maximizing profitability and improving customer engagement.
+
+-   **Research Questions:**
+
+    -How do seasonal trends impact sales across product categories and regions?
+
+    -What is the relationship between discounts, sales volumes, and profit margins?\
+    \
+
+## Introduction to the Data
+
+-   **Dataset Overview:** Contains 9,994 entries across 19 columns from a superstore. Encompasses sales transactions, customer insights, product information, and geographical data.
+
+-   **Key Variables used for analysis:**
+
+    \- Product Information: Category, Subcategory.
+
+    \- Geographical Data: Region.
+
+    \- Financial Metrics: Sales, Quantity, Discount, Profit, Profit Margin.
+
+    \- Dates: Altered for confidentiality while maintaining data integrity.
+
+## Key Insights from EDA
+
+-   Sales Distribution: Furniture, Office Supplies, and Technology contribute almost equally to sales.
+
+-   Seasonal Trends: Significant variability in monthly sales; profits remain relatively stable.
+
+-   Top 5 cities by sales: NYC, LA, Seattle, Philadelphia, San Francisco. Highlights regional strengths for targeted strategies.
+
+-   Profitability Analysis: Technology products have the highest profit margins, whereas Furniture, despite high sales, yields lower margins.
+
+## Seasonal Trends and Sales Performance Analysis
+
+#### **Plot 1**
+
+<iframe src="interactive_plot.html" width="100%" height="400">
+
+</iframe>
+
+## Seasonal Trends and Sales Performance Analysis
+
+#### **Plot 2**
+
+<iframe src="plotly_plot.html" width="100%" height="400">
+
+</iframe>
+
+## Impact of Discounts on Sales and Profit Margins
+
+#### ![](images/clipboard-1903679558.png){width="350" height="342"}![](images/clipboard-2726884389.png){width="536"}
+
+## Impact of Discounts on Sales and Profit Margins
+
+<iframe src="plot_3d.html" style="width:100%; height:580px;" frameborder="0">
+
+</iframe>
+
+## Conclusion and Future Work
+
+**Conclusion:** A 20% increase in discounts corresponds to a 35% rise in sales quantity, showing a strong positive relationship between these variables. Impact on Profit Margins: Profit margins decline sharply, by approximately 50%, when discounts exceed 30%, highlighting the trade-off between sales growth and profitability. Optimal Strategy: Discounts in the range of 10-20% appear to balance sales growth and profit margins effectively, maintaining profitability without excessive erosion.
+
+**Future Work:** Customer Segmentation for Targeted Campaigns: Utilizing clustering techniques to identify distinct customer segments can help businesses design personalized marketing campaigns. For example, high-value customers may receive loyalty discounts, while price-sensitive customers can be targeted with volume-based offers.
+
+Scenario Simulation for Strategic Planning: Running "what-if" simulations on different discount levels or pricing models can help businesses assess potential risks and rewards. This insight can guide strategic planning for promotions, especially during key events like Black Friday or holiday sales.
+
+Incorporating External Trends: Integrating macroeconomic factors such as inflation or consumer sentiment can enhance discount strategies by aligning them with broader market conditions. For instance, adjusting discounts during economic downturns could help maintain customer loyalty and stabilize sales.

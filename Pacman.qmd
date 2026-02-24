@@ -1,0 +1,491 @@
+---
+title: "Pacman"
+format: html
+editor: visual
+execute: 
+  warning: false
+  message: false
+---
+
+### Loading necessary libraries
+
+```{r}
+#| label: load-pkgs
+#| message: false
+
+# Load the necessary libraries
+pacman::p_load(tidyverse,
+               ggplot2,
+               dplyr,
+               plotly,
+               lubridate,
+               scales,
+               reshape2)
+
+
+```
+
+### Data Initialization
+
+```{r}
+#| label: load-dataset
+#| message: false
+data <- read.csv("data/Different_stores_dataset.csv")
+glimpse(data)
+
+```
+
+### Data Preprocessing
+
+```{r}
+#| label: data-preprocessing
+#| message: false
+
+# Check the missing values
+sum(is.na(data))
+
+# Check unique values for categorical columns
+unique(data$category)
+unique(data$region)
+unique(data$segment)
+
+# Convert order_date and ship_date to date format
+data$order_date <- as.Date(data$order_date, format = "%m/%d/%Y")
+data$ship_date <- as.Date(data$ship_date, format = "%m/%d/%Y")
+
+# Extract Year, Month, and Season from order_date
+data$year <- year(data$order_date)
+data$month <- month(data$order_date)
+data$season <- case_when(
+  data$month %in% c(12, 1, 2) ~ "Winter",
+  data$month %in% c(3, 4, 5) ~ "Spring",
+  data$month %in% c(6, 7, 8) ~ "Summer",
+  data$month %in% c(9, 10, 11) ~ "Fall"
+)
+
+# Calculate total sales and profit margins
+data <- data %>%
+  mutate(
+    total_sales = sales * quantity,
+    profit_margin = profit / sales * 100
+  )
+
+# Handle any missing or negative values
+data <- data %>%
+  filter(!is.na(total_sales) & !is.na(profit_margin))
+
+# Group data by season, category, and region
+aggregated_data <- data %>%
+  group_by(season, category, region, segment) %>%
+  summarise(
+    avg_discount = mean(discount, na.rm = TRUE),
+    total_sales = sum(total_sales, na.rm = TRUE),
+    avg_profit_margin = mean(profit_margin, na.rm = TRUE),
+    .groups = 'drop'
+  )
+
+# Normalize total_sales
+data$total_sales_normalized <- (data$total_sales - min(data$total_sales, na.rm = TRUE)) /
+                               (max(data$total_sales, na.rm = TRUE) - min(data$total_sales, na.rm = TRUE))
+
+# Ensure categorical variables are treated as factors
+data$category <- as.factor(data$category)
+data$segment <- as.factor(data$segment)
+data$region <- as.factor(data$region)
+data$season <- factor(data$season, levels = c("Winter", "Spring", "Summer", "Fall"))
+
+glimpse(data)
+```
+
+### Exploratory Data Analysis:
+
+```{r}
+summary(data)
+```
+
+Product Category Distribution
+
+```{r}
+# Product Category Distribution with Percentages
+data %>%
+  group_by(category) %>%
+  summarise(total_sales = sum(total_sales, na.rm = TRUE)) %>%
+  mutate(percentage = total_sales / sum(total_sales) * 100) %>%
+  ggplot(aes(x = "", y = total_sales, fill = category)) +
+  geom_bar(stat = "identity", width = 1) +
+  coord_polar("y") +
+  theme_minimal() +
+  geom_text(aes(label = paste0(round(percentage, 1), "%")), 
+            position = position_stack(vjust = 0.5)) +
+  labs(
+    title = "Proportion of Sales by Product Category",
+    x = NULL,
+    y = NULL,
+    fill = "Category"
+  ) +
+  theme(axis.text.x = element_blank())
+
+
+```
+
+Sales and Trends by Month
+
+```{r}
+# Sales and Profit Trends by Month with Custom X-Axis Labels
+data %>%
+  group_by(month) %>%
+  summarise(
+    total_sales = sum(total_sales, na.rm = TRUE),
+    total_profit = sum(profit, na.rm = TRUE)
+  ) %>%
+  ggplot(aes(x = month)) +
+  geom_line(aes(y = total_sales, color = "Total Sales"), size = 1.2) +
+  geom_line(aes(y = total_profit, color = "Total Profit"), size = 1.2) +
+  scale_color_manual(values = c("Total Sales" = "blue", "Total Profit" = "green")) +
+  scale_x_continuous(breaks = c(3, 6, 9, 12), labels = c("3", "6", "9", "12")) +
+  theme_minimal() +
+  labs(
+    title = "Sales and Profit Trends by Month",
+    x = "Month",
+    y = "Value",
+    color = "Metric"
+  )
+
+
+```
+
+Top 5 cities by total sales
+
+```{r}
+data %>%
+  group_by(city) %>%
+  summarise(total_sales = sum(total_sales, na.rm = TRUE)) %>%
+  top_n(5, wt = total_sales) %>%
+  ggplot(aes(x = reorder(city, total_sales), y = total_sales, fill = city)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    title = "Top 5 Cities by Total Sales",
+    x = "City",
+    y = "Total Sales",
+    fill = "City"
+  ) +
+  theme(legend.position = "none")
+
+```
+
+### Question 1: Seasonal Trends and Sales Performance:
+
+#### Plot 1: Monthly sales by Category
+
+```{r}
+# Prepare data⁠
+monthly_sales <- data %>%
+  group_by(month, category) %>%
+  summarise(total_sales = sum(total_sales, na.rm = TRUE), .groups = 'drop')
+
+# Create the enhanced plot with a legend title
+ggplot(monthly_sales, aes(x = month, y = total_sales, color = category)) +
+  geom_line(size = 1) +                             
+  geom_point(size = 2) +                            
+  geom_smooth(method = "lm", se = FALSE,         
+              linetype = "solid", color = "black", linewidth = 0.2) +
+  labs(
+    title = "Monthly Sales Trends by Category",
+    x = "Month",
+    y = "Total Sales in USD",
+    color = "Product Category") +
+  theme_minimal(base_size = 14) +                   
+  theme(
+    plot.title = element_text(hjust = 0.5,           
+                              size = 16,
+                              family = "Arial"),
+    plot.title.position = "plot",
+    axis.text.x = element_text(hjust = 0.5,
+                               size = 12,
+                               family = "Arial"),          
+    axis.title = element_text(hjust = 0.5,
+                               size = 14,
+                               family = "Arial"),
+    axis.text = element_text(size = 12,
+                             hjust = 0.5,
+                             family = "Arial"),           
+    panel.grid.major.x = element_blank(),          
+    panel.grid.major.y = element_line(color = "gray", 
+                                      linetype = "dashed"), 
+    legend.text = element_text(size = 12),
+    legend.title = element_text(size = 12)     
+  ) +
+  scale_color_brewer(palette = "Set2") +           
+  scale_x_continuous(breaks = 1:12, labels = 1:12) + 
+  scale_y_continuous(labels = comma)              
+
+
+
+```
+
+#### Plot 2: Seasonal sales variation by region
+
+```{r}
+#| warning: false
+#| message: false
+
+# Data preparation 
+seasonal_sales_malls <- data %>%
+  group_by(season, region) %>%
+  summarise(total_sales = sum(total_sales, na.rm = TRUE), .groups = 'drop')
+
+# Static plot with all enhancements
+p <- ggplot(seasonal_sales_malls, aes(x = season, y = total_sales, fill = region)) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+ 
+  facet_wrap(~ region, scales = "fixed") +
+  scale_fill_brewer(palette = "Blues") +
+  
+  labs(
+    title = "Seasonal Sales Variations by Region", 
+    x = "Seasons", 
+    y = "Total Sales in USD",
+    fill = "Regions"
+  ) +
+  
+  # Polished theme
+  theme_classic() +
+  theme(
+    plot.title = element_text(size = 14, family = "Arial", hjust = 0.5),
+    plot.title.position = "plot",
+    axis.text = element_text(size = 10, family = "Arial", hjust = 0.5),
+    axis.title = element_text(size = 12, family = "Arial", hjust = 0.5),
+    legend.title = element_text(size = 12, family = "Arial", hjust = 0.5),
+    legend.position = "top"
+  )
+interactive_plot <- ggplotly(p)
+interactive_plot
+library(plotly)
+# `interactive_plot` is your plotly object
+htmlwidgets::saveWidget(interactive_plot, "interactive_plot.html")
+
+```
+
+#### Plot 3: Seasonal Sales by Categories
+
+```{r}
+
+# Bar plot for seasonal sales across categories
+seasonal_category_sales <- data %>%
+  group_by(season, category) %>%
+  summarise(total_sales = sum(total_sales, na.rm = TRUE), .groups = 'drop')
+
+ggplot(seasonal_category_sales, aes(x = season, y = total_sales, fill = category)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Seasonal Sales Across Categories",
+    x = "Seasons",
+    y = "Total Sales",
+    fill = "Category"
+  ) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "BuPu") +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 14, family = "Arial"),
+    text = element_text(family = "Arial", size = 12, hjust = 0.5),
+    axis.text = element_text(size = 10, hjust = 0.5, family = "Arial"),
+    axis.title = element_text(size = 12, hjust = 0.5, family = "Arial")
+  ) +
+  scale_y_continuous(labels = comma)
+```
+
+#### Plot 4: Heatmap of Seasonal Sales by Category and Region
+
+```{r}
+
+# Faceted heatmap plot for seasonal sales across regions and categories
+faceted_data <- data %>%
+  group_by(season, category, region) %>%
+  summarise(total_sales = sum(total_sales, na.rm = TRUE), .groups = 'drop')
+
+# Create the ggplot2 plot as before
+ggplot_plot <- ggplot(faceted_data, aes(x = season, y = category, fill = total_sales)) +
+  geom_tile() +
+  facet_wrap(~region) +
+  labs(title = "Heatmap of Seasonal Sales by Category and Region", x = "Season", y = "Category") +
+  scale_fill_gradient(
+    low = "white",
+    high = "red",
+    name = "Total Sales",
+    breaks = scales::pretty_breaks(n = 5),
+    labels = scales::label_comma()
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(hjust = 0.5, family = "Arial", size = 16),
+  axis.title.x = element_text(hjust = 0.5, family = "Arial", size = 14),
+  axis.title.y = element_text(hjust = 0.5, family = "Arial", size = 14),
+  axis.text.x = element_text(hjust = 0.5, family = "Arial", size = 12),
+  axis.text.y = element_text(hjust = 0.5, family = "Arial", size = 12),
+  legend.title = element_text(hjust = 0.5, family = "Arial", size = 14))
+
+# Convert the ggplot2 plot to a plotly object
+plotly_plot <- ggplotly(ggplot_plot)
+
+# Customize the plot
+plotly_plot <- plotly_plot %>%
+  layout(title = list(text = "Heatmap of Seasonal Sales by Category and Region", x = 0.5))
+
+# Display the interactive plot
+plotly_plot
+htmlwidgets::saveWidget(plotly_plot, "plotly_plot.html")
+
+```
+
+### Question 2: Discounts, Sales Volumes, and Profit Margins
+
+#### Plot 1: Relation between Discounts and sales
+
+```{r}
+data$discount <- data$discount * 100
+
+# Scatter plot for discounts vs. sales volumes
+ggplot(data, aes(x = discount, y = quantity)) +
+  geom_point(alpha = 0.5, color = "blue") +
+  labs(title = "Correlation Between Discounts and Sales Volumes", x = "Discount (%)", y = "Quantity") +
+  theme_minimal() +
+  theme(
+  plot.title = element_text(hjust = 0.5, family = "Arial", size = 16),
+  axis.title.x = element_text(hjust = 0.5, family = "Arial", size = 14),
+  axis.title.y = element_text(hjust = 0.5, family = "Arial", size = 14),
+  axis.text.x = element_text(hjust = 0.5, family = "Arial", size = 12),
+  axis.text.y = element_text(hjust = 0.5, family = "Arial", size = 12)
+)
+```
+
+#### Plot 2: Impact of Discounts on Profit Margin by Category
+
+```{r}
+
+ggplot(data, aes(x = discount, y = profit_margin)) +
+  geom_point(alpha = 0.7, color = "salmon", size = 2.5) + 
+  geom_smooth(method = "lm", se = FALSE, color = "steelblue", size = 1) + 
+  facet_wrap(~ category, scales = "free") + 
+  labs(
+    title = "Impact of Discounts on Profit Margins by Category",
+    subtitle = "Faceted by category for detailed insights",
+    x = "Discount (%)",
+    y = "Profit Margin (%)"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(hjust = 0.5, size = 16, face = "bold", family = "Arial"), 
+    plot.subtitle = element_text(hjust = 0.5, size = 12, family = "Arial"), 
+    axis.title = element_text(size = 12, family = "Arial", face = "italic"), 
+    strip.text = element_text(size = 12, family = "Arial", face = "bold"), 
+    panel.grid.major = element_line(color = "grey90", linetype = "dotted"), 
+    panel.grid.minor = element_blank(), 
+    plot.margin = margin(10, 10, 10, 10) 
+  )
+```
+
+#### Plot 3: Correlation matrix
+
+```{r mat}
+# Calculate the correlation matrix from selected columns
+cor_matrix <- data %>%
+  select(discount, quantity, profit_margin) %>%
+  cor(use = "complete.obs")
+
+# Melt the correlation matrix for ggplot2 usage
+cor_melt <- melt(cor_matrix)
+
+# Create a heatmap
+ggplot(cor_melt, aes(x = Var1, y = Var2, fill = value)) +
+  geom_tile(color = "white") +
+  scale_fill_gradient(low ="#88d8c0" , high = "#01796f", name = "Correlation") +
+  labs(title = "Correlation Matrix: Discounts, Quantity, and Profit Margins",
+       subtitle = "Correlation coefficients between variables",
+       x = "", y = "") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 0, hjust = 0.5, size = 10),
+        plot.title = element_text(hjust = 0.5, family = "Arial", size = 14),
+        plot.subtitle = element_text(hjust = 0.5, family = "Arial", size = 12))
+
+
+```
+
+#### Plot 4: 3D Scatter plot to visualize profit margin, discount and the Quantity sold
+
+```{r scatterp}
+
+
+# Create the 3D scatter plot using plotly
+plot_3d <- plot_ly(
+  data = data,
+  x = ~discount,
+  y = ~quantity,
+  z = ~profit_margin,
+  type = 'scatter3d',
+  mode = 'markers',
+  marker = list(
+    size = 5,
+    color = ~profit_margin,       
+    colorscale = 'Viridis',       
+    opacity = 0.8                 
+  ),
+  hoverinfo = 'text',             
+  text = ~paste(
+    "Discount: ", discount, 
+    "<br>Quantity: ", quantity, 
+    "<br>Profit Margin: ", profit_margin
+  )
+) %>%
+  layout(
+    title = "3D Scatter Plot: Discounts vs Sales vs Profit Margins",
+    scene = list(
+      xaxis = list(
+        title = "Discount (%)",
+        showgrid = TRUE,
+        zeroline = TRUE,
+        backgroundcolor = 'rgb(240,240,240)',  
+        gridcolor = 'rgb(200,200,200)'        
+      ),
+      yaxis = list(
+        title = "Quantity Sold",
+        showgrid = TRUE,
+        zeroline = TRUE,
+        backgroundcolor = 'rgb(240,240,240)',
+        gridcolor = 'rgb(200,200,200)'
+      ),
+      zaxis = list(
+        title = "Profit Margin (%)",
+        showgrid = TRUE,
+        zeroline = TRUE,
+        backgroundcolor = 'rgb(240,240,240)',
+        gridcolor = 'rgb(200,200,200)'
+      ),
+      camera = list(
+        eye = list(x = 1.5, y = 1.5, z = 1.5)  
+      )
+    ),
+    annotations = list(
+      list(
+        x = 20, y = 50, z = 0.2,
+        text = "High Discount, Low Profit",
+        showarrow = TRUE,
+        arrowhead = 4,
+        arrowcolor = 'red',
+        font = list(size = 12)
+      )
+    ),
+    paper_bgcolor = 'rgba(240,240,240,1)',  
+    plot_bgcolor = 'rgba(240,240,240,1)',  
+    showlegend = TRUE                      
+  )
+
+# Output the plot
+plot_3d
+
+# Save the interactive plot as an HTML file
+htmlwidgets::saveWidget(plot_3d, "plot_3d.html")
+
+
+```
